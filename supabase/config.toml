@@ -1,0 +1,8 @@
+project_id = "paczkomat-speedrun"
+
+# Login is called before the player has a session.
+[functions.inpost-login]
+verify_jwt = false
+
+[functions.runs]
+verify_jwt = true

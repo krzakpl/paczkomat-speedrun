@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Paczkomat Speedrun</title>
+  <meta name="description" content="Leaderboard of the fastest paczkomat pickups, verified with InPost.">
+  <link rel="stylesheet" href="assets/style.css">
+  <script src="assets/config.js"></script>
+  <script type="module" src="assets/app.js"></script>
+</head>
+<body>
+  <header class="top">
+    <div class="wrap top-row">
+      <a class="brand" href="./"><span class="logo" aria-hidden="true">⏱</span> Paczkomat Speedrun</a>
+      <div id="session" class="session"></div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="hero">
+      <h1>How fast do you get to your paczkomat?</h1>
+      <p>The clock starts when InPost puts your parcel in the locker and stops when you open it. Log in with the phone number you use for InPost, pick a collected parcel, and your time is checked against InPost's own tracking.</p>
+    </section>
+
+    <div id="notice" class="notice" hidden></div>
+
+    <div class="grid">
+      <section class="card board">
+        <div class="card-head">
+          <h2>Leaderboard</h2>
+          <span class="muted small">Best run per player</span>
+        </div>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr><th class="num">#</th><th>Player</th><th>Time</th><th class="hide-sm">Paczkomat</th><th class="hide-sm">Date</th></tr>
+            </thead>
+            <tbody id="board-body">
+              <tr><td colspan="5" class="muted">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <aside class="side">
+        <section id="login-card" class="card" hidden>
+          <h2>Log in with InPost</h2>
+          <p class="muted small">InPost texts you a code, the same way the InPost app does. Your phone number is never shown on the site.</p>
+          <form id="phone-form" class="stack">
+            <label for="phone">Phone number</label>
+            <div class="phone-input"><span>+48</span><input id="phone" name="phone" inputmode="tel" autocomplete="tel-national" placeholder="600 100 200" required></div>
+            <button type="submit">Send code</button>
+          </form>
+          <form id="code-form" class="stack" hidden>
+            <label for="code">6-digit SMS code</label>
+            <input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="\d{6}" required>
+            <button type="submit">Log in</button>
+            <button type="button" id="change-phone" class="link">Use a different number</button>
+          </form>
+        </section>
+
+        <section id="submit-card" class="card" hidden>
+          <h2>Submit a run</h2>
+          <form id="name-form" class="inline">
+            <label for="display-name" class="small">Your name on the board</label>
+            <div class="row">
+              <input id="display-name" minlength="2" maxlength="32" required>
+              <button type="submit" class="secondary">Save</button>
+            </div>
+          </form>
+
+          <div class="card-head sub">
+            <h3>Your collected parcels</h3>
+            <button type="button" id="reload-parcels" class="link">Refresh</button>
+          </div>
+          <ul id="parcels" class="parcels"><li class="muted small">Loading…</li></ul>
+
+          <form id="manual-form" class="stack">
+            <label for="shipment">Or enter a tracking number</label>
+            <div class="row">
+              <input id="shipment" inputmode="numeric" placeholder="24-digit number" required>
+              <button type="submit">Submit</button>
+            </div>
+          </form>
+        </section>
+      </aside>
+    </div>
+  </main>
+
+  <footer class="wrap muted small foot">
+    Not affiliated with InPost. Login uses InPost's unofficial mobile API and may stop working at any time.
+  </footer>
+</body>
+</html>
