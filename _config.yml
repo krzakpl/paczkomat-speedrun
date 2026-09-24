@@ -2,3 +2,4 @@ title: Paczkomat Speedrun
 exclude:
   - supabase
   - README.md
+  - .gitignore
