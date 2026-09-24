@@ -104,44 +104,88 @@ supabase.auth.onAuthStateChange((_event, session) => {
 
 // ---- Login ----
 
-let pendingPhone = "";
+// OAuth with PKCE against the InPost app's login. InPost only redirects to its own callback
+// page, so the player copies that URL back here and the server exchanges the code.
+const INPOST_AUTHORIZE = "https://account.inpost-group.com/oauth2/authorize";
+const PKCE_KEY = "inpost-pkce";
+const PKCE_MAX_AGE_MS = 15 * 60_000;
 
-$("phone-form").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  busy(e.target, true);
+function base64url(bytes) {
+  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function readPkce() {
   try {
-    pendingPhone = $("phone").value;
-    await call("inpost-login", { action: "send", phone: pendingPhone });
-    $("phone-form").hidden = true;
-    $("code-form").hidden = false;
-    $("code").focus();
-    notice("Code sent. Check your SMS from InPost.");
-  } catch (err) {
-    notice(err.message, "error");
-  } finally {
-    busy(e.target, false);
+    const saved = JSON.parse(localStorage.getItem(PKCE_KEY));
+    if (saved && Date.now() - saved.created < PKCE_MAX_AGE_MS) return saved;
+  } catch {
+    // storage unavailable or corrupt
   }
-});
+  return null;
+}
 
-$("code-form").addEventListener("submit", async (e) => {
+let pkce;
+
+// Reuses a pending login (the page may reload while the player is on InPost's page).
+async function preparePkce(fresh = false) {
+  pkce = (!fresh && readPkce()) || {
+    // Alphanumeric only, like the InPost app's own verifiers.
+    verifier: base64url(crypto.getRandomValues(new Uint8Array(64))).replace(/[^A-Za-z0-9]/g, "").slice(0, 64),
+    state: base64url(crypto.getRandomValues(new Uint8Array(12))),
+    created: Date.now(),
+  };
+  try {
+    localStorage.setItem(PKCE_KEY, JSON.stringify(pkce));
+  } catch {
+    // login still works as long as this tab stays open
+  }
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(pkce.verifier));
+  const params = new URLSearchParams({
+    response_type: "code",
+    client_id: "inpost-mobile",
+    redirect_uri: "https://account.inpost-group.com/callback",
+    scope: "openid",
+    code_challenge: base64url(new Uint8Array(digest)),
+    code_challenge_method: "S256",
+    state: pkce.state,
+    nonce: base64url(crypto.getRandomValues(new Uint8Array(8))),
+    lang: "pl",
+    response_mode: "query",
+  });
+  const link = $("inpost-login-link");
+  link.href = `${INPOST_AUTHORIZE}?${params}`;
+  link.removeAttribute("aria-disabled");
+}
+
+function parseCallback(input) {
+  const text = input.trim();
+  if (!/[?&]code=/.test(text)) return { code: text };
+  const params = new URLSearchParams(text.slice(text.indexOf("?") + 1).split("#")[0]);
+  return { code: params.get("code"), state: params.get("state") };
+}
+
+preparePkce();
+
+$("callback-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   busy(e.target, true);
   try {
-    const { token_hash } = await call("inpost-login", { action: "verify", phone: pendingPhone, code: $("code").value });
+    const { code, state } = parseCallback($("callback").value);
+    if (!code) throw new Error("That link has no login code in it. Copy the whole address of InPost's last page.");
+    if (state && state !== pkce.state) {
+      throw new Error("That link is from an older login attempt. Open InPost login again.");
+    }
+    const { token_hash } = await call("inpost-login", { code, verifier: pkce.verifier });
     const { error } = await supabase.auth.verifyOtp({ token_hash, type: "magiclink" });
     if (error) throw error;
     notice("");
-    $("code-form").reset();
+    e.target.reset();
+    await preparePkce(true);
   } catch (err) {
     notice(err.message, "error");
   } finally {
     busy(e.target, false);
   }
-});
-
-$("change-phone").addEventListener("click", () => {
-  $("code-form").hidden = true;
-  $("phone-form").hidden = false;
 });
 
 // ---- Profile ----
