@@ -1,5 +1,16 @@
 # Paczkomat Speedrun
 
+vibecoded with Claude because I'm too lazy for this shit post
+
+just visit the site https://krzakpl.github.io/paczkomat-speedrun/
+and submit a time
+
+maybe it will work this time
+
+
+
+I don't even know why did he wrote all this ↓
+
 A leaderboard for how fast people pick up InPost parcels. The clock starts when InPost puts the parcel in the paczkomat and stops when the recipient opens the locker.
 
 - **Login:** the player signs in on InPost's own login page (the one the InPost app uses: phone, SMS code, captcha), then pastes the address of the page InPost redirects to back into the site. The `inpost-login` function exchanges the code in it (OAuth 2 with PKCE) for InPost tokens.
