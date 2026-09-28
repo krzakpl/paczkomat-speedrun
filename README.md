@@ -1,6 +1,9 @@
 # Paczkomat Speedrun
 
-vibecoded with Claude because I'm too lazy for this shit post
+vibecoded with Claude because ~~I'm too lazy for this shit post~~
+now that I think about it, I really just asked him to code anything from GitHub because I got free credits
+
+I will rewrite all of this some time in the future
 
 just visit the site https://krzakpl.github.io/paczkomat-speedrun/
 and submit a time
