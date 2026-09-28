@@ -20,7 +20,7 @@
   <main class="wrap">
     <section class="hero">
       <h1>How fast do you get to your paczkomat?</h1>
-      <p>The clock starts when InPost puts your parcel in the locker and stops when you open it. Log in with the phone number you use for InPost, pick a collected parcel, and your time is checked against InPost's own tracking.</p>
+      <p>The clock starts when InPost puts your parcel in the locker and stops when you open it. Log in with your InPost account, pick a collected parcel, and your time is checked against InPost's own tracking.</p>
     </section>
 
     <div id="notice" class="notice" hidden></div>
@@ -46,17 +46,20 @@
       <aside class="side">
         <section id="login-card" class="card" hidden>
           <h2>Log in with InPost</h2>
-          <p class="muted small">InPost texts you a code, the same way the InPost app does. Your phone number is never shown on the site.</p>
-          <form id="phone-form" class="stack">
-            <label for="phone">Phone number</label>
-            <div class="phone-input"><span>+48</span><input id="phone" name="phone" inputmode="tel" autocomplete="tel-national" placeholder="600 100 200" required></div>
-            <button type="submit">Send code</button>
-          </form>
-          <form id="code-form" class="stack" hidden>
-            <label for="code">6-digit SMS code</label>
-            <input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="\d{6}" required>
+          <p class="muted small">You sign in on InPost's own page, the same login as the InPost app. The site never sees your phone number.</p>
+          <ol class="steps">
+            <li>
+              <a id="inpost-login-link" class="button" target="_blank" rel="noopener" aria-disabled="true">Open InPost login</a>
+              <span class="muted small">Enter your phone number, the SMS code and the captcha.</span>
+            </li>
+            <li>
+              <span class="muted small">When InPost is done you'll land on an empty page. Copy that page's full link from the address bar.</span>
+            </li>
+          </ol>
+          <form id="callback-form" class="stack">
+            <label for="callback">Paste the link here</label>
+            <input id="callback" name="callback" autocomplete="off" placeholder="https://account.inpost-group.com/callback?code=…" required>
             <button type="submit">Log in</button>
-            <button type="button" id="change-phone" class="link">Use a different number</button>
           </form>
         </section>
 
@@ -89,7 +92,7 @@
   </main>
 
   <footer class="wrap muted small foot">
-    Not affiliated with InPost. Login uses InPost's unofficial mobile API and may stop working at any time.
+    Not affiliated with InPost. Login and parcel checks use InPost's unofficial app API and may stop working at any time.
   </footer>
 </body>
 </html>

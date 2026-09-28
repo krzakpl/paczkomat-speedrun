@@ -1,43 +1,75 @@
 // InPost access.
-// - Mobile API (unofficial, the one the InPost app uses): SMS login and the list of the
-//   user's own parcels. Proves a parcel belongs to the logged-in phone number.
+// - Mobile API (unofficial, the one the InPost app uses): OAuth login through
+//   account.inpost-group.com and the list of the user's own parcels. Proves a parcel
+//   belongs to the logged-in InPost account.
 // - ShipX public tracking: per-status timestamps used to time the run.
 
 import { admin, HttpError } from "./util.ts";
 
 const MOBILE = "https://api-inmobile-pl.easypack24.net";
 const SHIPX = "https://api-shipx-pl.easypack24.net/v1";
+const TOKEN_URL = `${MOBILE}/global/oauth2/token`;
+// Same client and redirect as the InPost app; the redirect page just shows the code in its URL.
+const CLIENT_ID = "inpost-mobile";
+const REDIRECT_URI = "https://account.inpost-group.com/callback";
+// InPost answers 500 to API calls without an app User-Agent.
+const USER_AGENT = "InPost-Mobile/4.4.2 (1)-release (iOS 26.2; iPhone15,3; pl)";
 
-async function mobile(path: string, init: RequestInit & { token?: string } = {}) {
-  const headers = new Headers(init.headers);
-  headers.set("Content-Type", "application/json");
-  if (init.token) headers.set("Authorization", `Bearer ${init.token.replace(/^Bearer\s+/i, "")}`);
-  return await fetch(`${MOBILE}${path}`, { ...init, headers });
+async function mobile(path: string, token: string) {
+  return await fetch(`${MOBILE}${path}`, {
+    headers: { Accept: "application/json", "User-Agent": USER_AGENT, Authorization: `Bearer ${token}` },
+  });
 }
 
-export async function sendSmsCode(phone: string): Promise<void> {
-  const res = await mobile("/v1/sendSMSCode", {
-    method: "POST",
-    body: JSON.stringify({ phoneNumber: phone }),
-  });
-  if (!res.ok) {
-    console.error("sendSMSCode", res.status, await res.text());
-    throw new HttpError(502, "InPost did not accept this number");
-  }
+interface Tokens {
+  accessToken: string;
+  refreshToken: string;
+  idToken?: string;
 }
 
-export async function confirmSmsCode(phone: string, code: string) {
-  if (!/^\d{6}$/.test(code)) throw new HttpError(400, "The SMS code has 6 digits");
-  const res = await mobile("/v1/confirmSMSCode", {
+async function tokenRequest(params: Record<string, string>): Promise<Tokens | null> {
+  const res = await fetch(TOKEN_URL, {
     method: "POST",
-    body: JSON.stringify({ phoneNumber: phone, smsCode: code, phoneOS: "Android" }),
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Accept: "application/json",
+      "User-Agent": USER_AGENT,
+    },
+    body: new URLSearchParams({ client_id: CLIENT_ID, ...params }),
   });
   if (!res.ok) {
-    console.error("confirmSMSCode", res.status, await res.text());
-    throw new HttpError(401, "Wrong or expired SMS code");
+    console.error("oauth2/token", params.grant_type, res.status, await res.text());
+    return null;
   }
   const body = await res.json();
-  return { authToken: body.authToken as string, refreshToken: body.refreshToken as string };
+  return { accessToken: body.access_token, refreshToken: body.refresh_token, idToken: body.id_token };
+}
+
+/** Exchanges the code from InPost's login redirect (PKCE) for tokens. */
+export async function exchangeCode(code: string, verifier: string): Promise<Tokens> {
+  const tokens = await tokenRequest({
+    grant_type: "authorization_code",
+    code,
+    code_verifier: verifier,
+    redirect_uri: REDIRECT_URI,
+  });
+  if (!tokens?.accessToken) {
+    throw new HttpError(401, "InPost rejected the login. Codes expire quickly, so log in again and paste the new link");
+  }
+  return tokens;
+}
+
+/** Stable InPost account id: the `sub` claim of the ID token (or access token). */
+export function accountId(tokens: Tokens): string {
+  for (const jwt of [tokens.idToken, tokens.accessToken]) {
+    try {
+      const payload = JSON.parse(atob(jwt!.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+      if (payload.sub) return String(payload.sub);
+    } catch {
+      // not a JWT, try the next one
+    }
+  }
+  throw new Error("InPost tokens carry no account id");
 }
 
 export interface MobileParcel {
@@ -53,26 +85,25 @@ export interface MobileParcel {
 export async function fetchOwnParcels(userId: string): Promise<MobileParcel[]> {
   const { data: cred } = await admin
     .from("inpost_credentials")
-    .select("auth_token, refresh_token")
+    .select("access_token, refresh_token")
     .eq("user_id", userId)
     .single();
   if (!cred) throw new HttpError(401, "Log in with InPost again");
 
-  let res = await mobile("/v3/parcels/tracked", { token: cred.auth_token });
-  if (res.status === 401) {
-    const refreshed = await mobile("/v1/authenticate", {
-      method: "POST",
-      body: JSON.stringify({ refreshToken: cred.refresh_token, phoneOS: "Android" }),
-    });
-    const body = refreshed.ok ? await refreshed.json() : null;
-    if (!body || body.reauthenticationRequired || !body.authToken) {
-      throw new HttpError(401, "Your InPost session expired, log in again");
-    }
+  let res = await mobile("/v4/parcels/tracked", cred.access_token);
+  if (res.status === 401 || res.status === 403) {
+    const tokens = await tokenRequest({ grant_type: "refresh_token", refresh_token: cred.refresh_token });
+    if (!tokens?.accessToken) throw new HttpError(401, "Your InPost session expired, log in again");
     await admin
       .from("inpost_credentials")
-      .update({ auth_token: body.authToken, updated_at: new Date().toISOString() })
+      .update({
+        access_token: tokens.accessToken,
+        // InPost may or may not rotate the refresh token.
+        refresh_token: tokens.refreshToken || cred.refresh_token,
+        updated_at: new Date().toISOString(),
+      })
       .eq("user_id", userId);
-    res = await mobile("/v3/parcels/tracked", { token: body.authToken });
+    res = await mobile("/v4/parcels/tracked", tokens.accessToken);
   }
   if (!res.ok) {
     console.error("parcels/tracked", res.status, await res.text());

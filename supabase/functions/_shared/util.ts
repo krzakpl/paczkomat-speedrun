@@ -39,13 +39,6 @@ export const admin = createClient(
   { auth: { persistSession: false, autoRefreshToken: false } },
 );
 
-/** Accepts "+48 600 100 200", "600-100-200" etc. and returns the 9-digit Polish number. */
-export function normalizePhone(input: unknown): string {
-  const digits = String(input ?? "").replace(/\D/g, "").replace(/^(0048|48)(?=\d{9}$)/, "");
-  if (!/^\d{9}$/.test(digits)) throw new HttpError(400, "Enter a 9-digit Polish phone number");
-  return digits;
-}
-
 export async function sha256(text: string): Promise<string> {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
   return Array.from(new Uint8Array(buf), (b) => b.toString(16).padStart(2, "0")).join("");
